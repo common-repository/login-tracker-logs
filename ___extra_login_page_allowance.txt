@@ -1,0 +1,181 @@
+
+
+		//enable LOGIN PAGE "allower" extra-step
+		//	if(empty($opts['login_allowance']))			{ $opts['login_allowance']=1; }
+		//	if(empty($opts['message_for_login_allow']))	{ $opts['message_for_login_allow']='Enter <b>hello</b> to continue..';	}
+		//	if(empty($opts['hint']))					{ $opts['hint']='hello'; }
+		//	if(empty($opts['hint_attempts']))			{ $opts['hint_attempts']=3; }
+		//	if(empty($opts['block_minutes']))			{ $opts['block_minutes']=5; }
+		//	if(empty($opts['allowed_login_days']))		{ $opts['allowed_login_days']=1; }
+		//	if(empty($opts['encrypt_salt']))			{ $opts['encrypt_salt']=rand(1,11111111)*rand(1,11111111); }
+		//	if(empty($opts['blocked_login_ips']))		{ $opts['blocked_login_ips']=array(); }
+		//	if(empty($opts['allowed_login_ips']))		{ $opts['allowed_login_ips']=array(); }
+
+
+			
+		//check if we are on login page to show LOGIN_ALLOWANCE
+			add_action('plugins_loaded',	array($this, 'login_page_allowance') ); 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	// =============== make protection of LOGIN PAGE itself ===================== //
+	
+	public function login_page_allowance(){
+		$opts= $this->my_options_array;
+	  //if functionality not implemented by user, then return back ...
+		if (empty($opts['login_allowance'])) {return true;}
+	  //if user is on login page
+		if(IsLoginPage__LRL){   $passed=false;
+			
+		  //if IP is blacklisted at all...
+			if( "blockedddd" == $this->ALLOWED_IP_counting('login_allowancee__LRL', "NEED_ANSWERR")) { exit('BLOCKED! WAIT '. BLOCK_mins_remaining__LRL .' minutes'); }
+			
+		  //otherwise, continue...
+			$this->user_cookiename = $this->userip.'__'.$this->simple_encrypt($this->userip, $opts['encrypt_salt']);
+
+		  //if form was submited...
+			if(!empty($_POST['hint'])){
+			  //if correctly entered, then let him free for 5 days...
+				if($_POST['hint'] == $opts['hint']){
+					$rand= $this->RandomString();
+					$passed=true; setcookie($this->user_cookiename, $rand, time()+ 24*60*60 * $opts['allowed_login_days'], '/'); 
+					$_COOKIE[$this->user_cookiename]='allowedd';
+					$opts['allowed_login_ips'][$this->userip][$rand]['code']=$rand;
+					$opts['allowed_login_ips'][$this->userip][$rand]['time']=time();
+					update_option($this->my_options_name, $opts);
+					return;
+				}
+			  //if incorrectly entered, then show form.
+				else{	$this->ALLOWED_IP_counting('login_allowancee__LRL', "UPDATE_ANSWERR");	$this->ShowForm();exit;	}
+			}
+		  //if form not submited, but just entered the login page
+			else{
+			  //if COOKIE was not set for user, then show him FORM
+				if(!isset($_COOKIE[$this->user_cookiename])){ $this->ShowForm(); exit; }
+			  //if COOKIE was set..
+				else{
+					$ck_VALUE = $_COOKIE[$this->user_cookiename];  
+				  // if value is set INCORRECTLY (tries faking??), then show him form..
+					if(!array_key_exists($ck_VALUE, $opts['allowed_login_ips'][$this->userip] ) ){ 
+						$answer = $this->ALLOWED_IP_counting('login_allowancee__LRL', "UPDATE_ANSWERR");
+						$message= '<div style="color:red;">Remains '.( $opts['hint_attempts'] - ( is_numeric($answer) ? $answer : 0) ).' attempts.<br/></div>' ;
+						$this->ShowForm($message);
+						exit;	 
+					}
+				  //if value is set correctly, but time have gone..
+					elseif( $opts['allowed_login_ips'][$this->userip][$ck_VALUE]['time'] < time() + 24*60*60*$opts['allowed_login_days']){
+						$this->ShowForm();
+						exit;
+					}
+				  //else, let him free!   (just reset counter)
+					else{   $this->ALLOWED_IP_counting('login_attempts_gstsa', "RESET_COUNTERR", $this->userip); }
+				}
+			}
+		}
+	}
+
+
+	public function ShowForm($message=false){ $opts= $this->my_options_array; 
+		echo '
+		<style>
+		body {background: #82de82; text-align: center; } 
+		* {position:relative;}
+		.mainDIV{margin: 0 0 0 0; top: 30px; }
+		.mainDIV .title{font-size: 2em; }
+		input { border-radius: 5px; margin: 10px; height: 50px; font-size: 2em; box-shadow: 0px 0px 1px red;  }
+		input[type="submit"] {font-size:2em;}
+		</style>
+		<div class="mainDIV"><div class="title">'.$opts['message_for_login_allow'] .'</div><form action="" method="post"  ><input type="text" name="hint" value="" class="smth1 inptt" /><br/><input type="submit" value="SUBMIT" class="submitttt" /></form>'.( $message ? $message : '').  '</div>';
+	}
+
+
+	public function ALLOWED_IP_counting($action_name='',  $operation="", $username ='_'){ 
+		$ip = $_SERVER['REMOTE_ADDR'];  $u = $username; 
+		$opts= $this->my_options_array;
+
+		$attempts = get_option($action_name);
+		//if first time when IP fails
+		if(empty($attempts) || empty($attempts[$ip]) || empty($attempts[$ip][$u])){		
+				$attempts[$ip][$u]['count']		= 0; 
+				$attempts[$ip][$u]['lock']		= false;
+				$attempts[$ip][$u]['lastTime']	= time();
+				update_option($action_name, $attempts); 
+				return "started_user";
+		}
+		//if this is not first time, when IP fails, then check details...
+		else {
+			$minutes_after_lastFail = intval((time() - intval($attempts[$ip][$u]['lastTime']) )/60);
+			if(!defined('BLOCK_mins_remaining__LRL')) { define('BLOCK_mins_remaining__LRL', ceil( $opts['block_minutes'] - $minutes_after_lastFail )  ); }
+
+			// IN CASE WE ARE REQUESTING only ANSWER if user is locked
+			if ($operation=="NEED_ANSWERR") {  
+				//if user is not locked
+				if($attempts[$ip][$u]['lock'] == false){  return "alloweddd";  	}
+				//if locked,and block period now
+				elseif ($opts['block_minutes'] > $minutes_after_lastFail ){	return "blockedddd"; }
+				//else (if locked,and block period gone)
+				return "blockperiod passed";
+			}
+			//IF WE ARE RESETTING values
+			elseif($operation=='RESET_COUNTERR'){
+				$attempts[$ip][$u]['count']		= 0; 
+				$attempts[$ip][$u]['lastTime']	= time(); 
+				$attempts[$ip][$u]['lock']		= false;
+				update_option($action_name, $attempts); 
+				return "resetedd";
+			}
+			//in case we can make it to update value
+			else{  // "UPDATE_ANSWERR"
+				//if IP not blocked 
+				if	($attempts[$ip][$u]['lock'] == false){
+					//if maximum attempts yet NOT reached
+					if($attempts[$ip][$u]['count'] < $opts['hint_attempts']) {	
+						$attempts[$ip][$u]['count']		= $attempts[$ip][$u]['count'] + 1; 
+						$attempts[$ip][$u]['lastTime']	= time(); 
+						$attempts[$ip][$u]['lock']		= false;
+					}
+					//else if maximum failed attempts reached,  set him LOCK
+					else  {	
+						$attempts[$ip][$u]['count']		= 0; 	 
+						$attempts[$ip][$u]['lastTime']	= time();
+						$attempts[$ip][$u]['lock'] 		= true;
+					}
+				}
+				//if IP blocked
+				else {
+					//IF STILL in BLOCKED PERIOD, THEN DO NOTHING INCREASE/DECREASE OPERATION...
+					if ($opts['block_minutes'] > $minutes_after_lastFail ){
+						$attempts[$ip][$u]['count']		= 0; 
+						$attempts[$ip][$u]['lock']		= true;
+						$attempts[$ip][$u]['lastTime']	= $attempts[$ip][$u]['lastTime'];
+					}
+					//if BLOCKED PERIOD has gone, we need to reset counter
+					else{
+						$attempts[$ip][$u]['count']		= 0; 
+						$attempts[$ip][$u]['lock']		= false;
+						$attempts[$ip][$u]['lastTime']	= time();
+					}  
+				}
+				//trigger UPDATE
+				update_option($action_name, $attempts); 
+				$answer =  $opts['hint_attempts']-$attempts[$ip][$u]['count'];
+				return $answer;
+			}
+		}
+	}  
+
